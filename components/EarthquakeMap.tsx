@@ -2,9 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 
-// Static export bundlers can mangle the module-worker URL; serve it ourselves.
 const WORKER_URL = `${typeof window !== "undefined" ? window.location.origin : ""}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/maplibre-gl-worker.mjs`;
-maplibregl.setWorkerUrl(WORKER_URL); // must be absolute: maplibre resolves it against a placeholder base
+maplibregl.setWorkerUrl(WORKER_URL); // must be absolute: maplibre resolves relative URLs against an invalid placeholder base
 import { QuakeEvent, ThemeMode } from "@/lib/types";
 import { MAG_STOPS, DEPTH_STOPS, magColor } from "@/lib/scale";
 import { Layers, Satellite, Mountain } from "lucide-react";
@@ -31,7 +30,6 @@ function satelliteStyle(): maplibregl.StyleSpecification {
 }
 
 export type BasemapKey = "dark" | "light" | "satellite";
-
 export interface FlyToRequest { center: [number, number]; zoom: number; nonce: number }
 
 export const QUICK_VIEWS: { key: string; label: string; center: [number, number]; zoom: number }[] = [
@@ -43,6 +41,12 @@ export const QUICK_VIEWS: { key: string; label: string; center: [number, number]
 ];
 
 const PLATES_URL = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/data/plates.json`;
+const QUAKE_LAYER_IDS = ["quakes-hit", "quakes-points", "quakes-ring-new", "quakes-ring-selected", "cluster-count", "clusters"];
+
+const pointRadius: maplibregl.ExpressionSpecification = ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]];
+const pointColor: maplibregl.ExpressionSpecification = ["step", ["coalesce", ["get", "mag"], -1], "#94a3b8", 0, MAG_STOPS[0].color, 2.5, MAG_STOPS[1].color, 4.5, MAG_STOPS[2].color, 6, MAG_STOPS[3].color, 7, MAG_STOPS[4].color];
+const depthStrokeColor: maplibregl.ExpressionSpecification = ["step", ["coalesce", ["get", "depth"], -1], "rgba(148,163,184,0.6)", 0, DEPTH_STOPS[0].stroke, 70, DEPTH_STOPS[1].stroke, 300, DEPTH_STOPS[2].stroke];
+const depthStrokeWidth: maplibregl.ExpressionSpecification = ["step", ["coalesce", ["get", "depth"], -1], 1, 0, DEPTH_STOPS[0].width, 70, DEPTH_STOPS[1].width, 300, DEPTH_STOPS[2].width];
 
 interface Props {
   events: QuakeEvent[];
@@ -58,12 +62,26 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const readyRef = useRef(false);
   const [basemap, setBasemap] = useState<BasemapKey | null>(null);
   const [showPlates, setShowPlates] = useState(true);
   const [clustering, setClustering] = useState(true);
   const effectiveBasemap: BasemapKey = basemap ?? (theme === "dark" ? "dark" : "light");
+  const lastBasemapRef = useRef<BasemapKey>("dark");
 
-  // Build GeoJSON from normalized events (all client-side; USGS geometry passthrough).
+  const eventsRef = useRef(events);
+  const selectedIdRef = useRef(selectedId);
+  const newIdsRef = useRef(newIds);
+  const onSelectRef = useRef(onSelect);
+  const clusteringRef = useRef(clustering);
+  const showPlatesRef = useRef(showPlates);
+  eventsRef.current = events;
+  selectedIdRef.current = selectedId;
+  newIdsRef.current = newIds;
+  onSelectRef.current = onSelect;
+  clusteringRef.current = clustering;
+  showPlatesRef.current = showPlates;
+
   const toGeoJSON = (evs: QuakeEvent[]): GeoJSON.FeatureCollection => ({
     type: "FeatureCollection",
     features: evs.map((e) => ({
@@ -73,14 +91,20 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
     })),
   });
 
-  const addLayers = (map: maplibregl.Map, clustered: boolean) => {
+  // Idempotent: removes our layers/sources safely (layers first), then re-adds everything.
+  const ensureLayers = (map: maplibregl.Map) => {
+    for (const id of [...QUAKE_LAYER_IDS, "plates"]) if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource("quakes")) map.removeSource("quakes");
     if (map.getSource("plates")) map.removeSource("plates");
+
     map.addSource("plates", { type: "geojson", data: PLATES_URL });
     map.addLayer({
       id: "plates", type: "line", source: "plates",
-      layout: { visibility: showPlates ? "visible" : "none" },
-      paint: { "line-color": "#64748b", "line-width": 1, "line-opacity": 0.55, "line-dasharray": [3, 2] },
+      layout: { visibility: showPlatesRef.current ? "visible" : "none" },
+      paint: { "line-color": "#8b98b0", "line-width": 1, "line-opacity": 0.55, "line-dasharray": [3, 2] },
     });
+
+    const clustered = clusteringRef.current;
     map.addSource("quakes", { type: "geojson", data: toGeoJSON(eventsRef.current), cluster: clustered, clusterMaxZoom: 7, clusterRadius: 44 });
     if (clustered) {
       map.addLayer({
@@ -99,45 +123,26 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
     }
     const pointFilter: maplibregl.FilterSpecification = clustered ? ["!", ["has", "point_count"]] : ["literal", true];
     map.addLayer({
-      id: "quakes-ring-selected", type: "circle", source: "quakes", filter: ["all", pointFilter, ["==", ["get", "id"], selectedIdRef.current ?? ""]],
-      paint: {
-        "circle-radius": ["+", ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], 5],
-        "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#22d3ee", "circle-stroke-width": 2.5,
-      },
+      id: "quakes-ring-selected", type: "circle", source: "quakes",
+      filter: ["all", pointFilter, ["==", ["get", "id"], selectedIdRef.current ?? ""]],
+      paint: { "circle-radius": ["+", pointRadius, 5], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#22d3ee", "circle-stroke-width": 2.5 },
     });
     map.addLayer({
-      id: "quakes-ring-new", type: "circle", source: "quakes", filter: ["all", pointFilter, ["in", ["get", "id"], ["literal", [...newIdsRef.current]]]],
-      paint: {
-        "circle-radius": ["+", ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], 4],
-        "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#fbbf24", "circle-stroke-width": 2, "circle-stroke-opacity": 0.9,
-      },
+      id: "quakes-ring-new", type: "circle", source: "quakes",
+      filter: ["all", pointFilter, ["in", ["get", "id"], ["literal", [...newIdsRef.current]]]],
+      paint: { "circle-radius": ["+", pointRadius, 4], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#fbbf24", "circle-stroke-width": 2, "circle-stroke-opacity": 0.9 },
     });
+    // Mirrors lib/scale.ts: radius = 3 + min(15, mag*2.1); color = magnitude class; stroke = depth class.
     map.addLayer({
       id: "quakes-points", type: "circle", source: "quakes", filter: pointFilter,
-      paint: {
-        // Mirrors lib/scale.ts: radius = 3 + min(15, mag * 2.1); color = magnitude class; stroke = depth class.
-        "circle-radius": ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]],
-        "circle-color": ["step", ["coalesce", ["get", "mag"], -1], "#94a3b8", 0, MAG_STOPS[0].color, 2.5, MAG_STOPS[1].color, 4.5, MAG_STOPS[2].color, 6, MAG_STOPS[3].color, 7, MAG_STOPS[4].color],
-        "circle-opacity": 0.82,
-        "circle-stroke-color": ["step", ["coalesce", ["get", "depth"], -1], "rgba(148,163,184,0.6)", 0, DEPTH_STOPS[0].stroke, 70, DEPTH_STOPS[1].stroke, 300, DEPTH_STOPS[2].stroke],
-        "circle-stroke-width": ["step", ["coalesce", ["get", "depth"], -1], 1, 0, DEPTH_STOPS[0].width, 70, DEPTH_STOPS[1].width, 300, DEPTH_STOPS[2].width],
-      },
+      paint: { "circle-radius": pointRadius, "circle-color": pointColor, "circle-opacity": 0.82, "circle-stroke-color": depthStrokeColor, "circle-stroke-width": depthStrokeWidth },
     });
     // Larger invisible hit targets for touch devices.
     map.addLayer({
       id: "quakes-hit", type: "circle", source: "quakes", filter: pointFilter,
-      paint: { "circle-radius": ["+", ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], 8], "circle-opacity": 0 },
+      paint: { "circle-radius": ["+", pointRadius, 8], "circle-opacity": 0 },
     });
   };
-
-  const eventsRef = useRef(events);
-  const selectedIdRef = useRef(selectedId);
-  const newIdsRef = useRef(newIds);
-  const onSelectRef = useRef(onSelect);
-  eventsRef.current = events;
-  selectedIdRef.current = selectedId;
-  newIdsRef.current = newIds;
-  onSelectRef.current = onSelect;
 
   // Init map once.
   useEffect(() => {
@@ -154,63 +159,58 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
     mapRef.current = map;
 
     map.on("load", () => {
-      addLayers(map, true);
-      wireInteractions(map);
+      readyRef.current = true;
+      ensureLayers(map);
     });
     map.on("style.load", () => {
-      // setStyle() drops runtime sources/layers — re-add them.
-      if (!map.getSource("quakes")) addLayers(map, clusteringRef.current);
+      if (readyRef.current) ensureLayers(map); // setStyle() drops runtime sources/layers
     });
 
-    const wireInteractions = (m: maplibregl.Map) => {
-      m.on("click", "quakes-hit", (e) => {
-        const f = e.features?.[0];
-        if (f?.properties?.id) onSelectRef.current(String(f.properties.id));
-      });
-      m.on("click", "clusters", async (e) => {
-        const f = e.features?.[0];
-        if (!f) return;
-        const clusterId = f.properties?.cluster_id;
-        const src = m.getSource("quakes") as maplibregl.GeoJSONSource;
-        try {
-          const zoom = await src.getClusterExpansionZoom(clusterId);
-          const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
-          m.easeTo({ center: [lon, lat], zoom });
-        } catch { /* cluster gone after refresh — ignore */ }
-      });
-      m.on("click", (e) => {
-        const hits = m.queryRenderedFeatures(e.point, { layers: ["quakes-hit", "clusters"] });
-        if (hits.length === 0) onSelectRef.current(null);
-      });
-      m.on("mousemove", "quakes-hit", (e) => {
-        m.getCanvas().style.cursor = "pointer";
-        const f = e.features?.[0];
-        if (!f) return;
+    map.on("click", "quakes-hit", (e) => {
+      const f = e.features?.[0];
+      if (f?.properties?.id) onSelectRef.current(String(f.properties.id));
+    });
+    map.on("click", "clusters", async (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const src = map.getSource("quakes") as maplibregl.GeoJSONSource;
+      try {
+        const zoom = await src.getClusterExpansionZoom(f.properties?.cluster_id);
         const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
-        const mag = f.properties?.mag;
-        const place = f.properties?.place;
-        popupRef.current?.remove();
-        popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14 })
-          .setLngLat([lon, lat])
-          .setHTML(`<strong>${mag === null || mag === undefined ? "M—" : "M" + Number(mag).toFixed(1)}</strong> · ${place}`)
-          .addTo(m);
-      });
-      m.on("mouseleave", "quakes-hit", () => {
-        m.getCanvas().style.cursor = "";
-        popupRef.current?.remove();
-      });
-    };
+        map.easeTo({ center: [lon, lat], zoom });
+      } catch { /* cluster gone after refresh — ignore */ }
+    });
+    map.on("click", (e) => {
+      const layers = ["quakes-hit", "clusters"].filter((l) => map.getLayer(l));
+      if (layers.length === 0) return;
+      const hits = map.queryRenderedFeatures(e.point, { layers });
+      if (hits.length === 0) onSelectRef.current(null);
+    });
+    map.on("mousemove", "quakes-hit", (e) => {
+      map.getCanvas().style.cursor = "pointer";
+      const f = e.features?.[0];
+      if (!f) return;
+      const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
+      const mag = f.properties?.mag;
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14 })
+        .setLngLat([lon, lat])
+        .setHTML(`<strong>${mag === null || mag === undefined ? "M—" : "M" + Number(mag).toFixed(1)}</strong> · ${f.properties?.place}`)
+        .addTo(map);
+    });
+    map.on("mouseleave", "quakes-hit", () => {
+      map.getCanvas().style.cursor = "";
+      popupRef.current?.remove();
+    });
 
     return () => {
       popupRef.current?.remove();
+      readyRef.current = false;
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const clusteringRef = useRef(clustering);
-  clusteringRef.current = clustering;
 
   // Push data updates into the source without re-creating layers.
   useEffect(() => {
@@ -223,50 +223,31 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getLayer("quakes-ring-selected")) return;
-    map.setFilter("quakes-ring-selected", ["all", clustering ? ["!", ["has", "point_count"]] : ["literal", true], ["==", ["get", "id"], selectedId ?? ""]] as maplibregl.FilterSpecification);
-    map.setFilter("quakes-ring-new", ["all", clustering ? ["!", ["has", "point_count"]] : ["literal", true], ["in", ["get", "id"], ["literal", [...newIds]]]] as maplibregl.FilterSpecification);
+    const pf: maplibregl.FilterSpecification = clustering ? ["!", ["has", "point_count"]] : ["literal", true];
+    map.setFilter("quakes-ring-selected", ["all", pf, ["==", ["get", "id"], selectedId ?? ""]]);
+    map.setFilter("quakes-ring-new", ["all", pf, ["in", ["get", "id"], ["literal", [...newIds]]]]);
   }, [selectedId, newIds, clustering]);
 
-  // Fly-to requests (quick views, event selection).
   useEffect(() => {
-    if (!flyTo || !mapRef.current) return;
-    mapRef.current.flyTo({ center: flyTo.center, zoom: flyTo.zoom, duration: 900 });
+    if (flyTo && mapRef.current) mapRef.current.flyTo({ center: flyTo.center, zoom: flyTo.zoom, duration: 900 });
   }, [flyTo]);
 
-  // Basemap switching (style swaps re-add layers via style.load).
+  // Basemap switching (style.load re-adds our layers).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    const style = effectiveBasemap === "satellite" ? satelliteStyle() : BASEMAP_STYLES[effectiveBasemap];
-    map.setStyle(style);
+    if (!map || lastBasemapRef.current === effectiveBasemap) return;
+    lastBasemapRef.current = effectiveBasemap;
+    map.setStyle(effectiveBasemap === "satellite" ? satelliteStyle() : BASEMAP_STYLES[effectiveBasemap]);
   }, [effectiveBasemap]);
 
-  // Tectonic plates toggle.
   useEffect(() => {
     const map = mapRef.current;
     if (map?.getLayer("plates")) map.setLayoutProperty("plates", "visibility", showPlates ? "visible" : "none");
   }, [showPlates]);
 
-  // Clustering toggle = rebuild layers.
+  // Clustering toggle = rebuild our layers.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map?.getSource("quakes")) return;
-    for (const l of ["quakes-hit", "quakes-points", "quakes-ring-new", "quakes-ring-selected", "cluster-count", "clusters"]) {
-      if (map.getLayer(l)) map.removeLayer(l);
-    }
-    map.removeSource("quakes");
-    const clustered = clustering;
-    map.addSource("quakes", { type: "geojson", data: toGeoJSON(eventsRef.current), cluster: clustered, clusterMaxZoom: 7, clusterRadius: 44 });
-    // re-add only the quake layers by re-running addLayers minus plates
-    if (clustered) {
-      map.addLayer({ id: "clusters", type: "circle", source: "quakes", filter: ["has", "point_count"], paint: { "circle-color": ["step", ["get", "point_count"], "#164e63", 20, "#155e75", 100, "#0e7490"], "circle-radius": ["step", ["get", "point_count"], 14, 20, 18, 100, 24], "circle-opacity": 0.85, "circle-stroke-color": "#22d3ee", "circle-stroke-width": 1, "circle-stroke-opacity": 0.5 } });
-      map.addLayer({ id: "cluster-count", type: "symbol", source: "quakes", filter: ["has", "point_count"], layout: { "text-field": "{point_count_abbreviated}", "text-size": 12 }, paint: { "text-color": "#e2e8f0" } });
-    }
-    const pointFilter: maplibregl.FilterSpecification = clustered ? ["!", ["has", "point_count"]] : ["literal", true];
-    map.addLayer({ id: "quakes-ring-selected", type: "circle", source: "quakes", filter: ["all", pointFilter, ["==", ["get", "id"], selectedIdRef.current ?? ""]], paint: { "circle-radius": ["+", ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], 5], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#22d3ee", "circle-stroke-width": 2.5 } });
-    map.addLayer({ id: "quakes-ring-new", type: "circle", source: "quakes", filter: ["all", pointFilter, ["in", ["get", "id"], ["literal", [...newIdsRef.current]]]], paint: { "circle-radius": ["+", ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], 4], "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#fbbf24", "circle-stroke-width": 2, "circle-stroke-opacity": 0.9 } });
-    map.addLayer({ id: "quakes-points", type: "circle", source: "quakes", filter: pointFilter, paint: { "circle-radius": ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], "circle-color": ["step", ["coalesce", ["get", "mag"], -1], "#94a3b8", 0, MAG_STOPS[0].color, 2.5, MAG_STOPS[1].color, 4.5, MAG_STOPS[2].color, 6, MAG_STOPS[3].color, 7, MAG_STOPS[4].color], "circle-opacity": 0.82, "circle-stroke-color": ["step", ["coalesce", ["get", "depth"], -1], "rgba(148,163,184,0.6)", 0, DEPTH_STOPS[0].stroke, 70, DEPTH_STOPS[1].stroke, 300, DEPTH_STOPS[2].stroke], "circle-stroke-width": ["step", ["coalesce", ["get", "depth"], -1], 1, 0, DEPTH_STOPS[0].width, 70, DEPTH_STOPS[1].width, 300, DEPTH_STOPS[2].width] } });
-    map.addLayer({ id: "quakes-hit", type: "circle", source: "quakes", filter: pointFilter, paint: { "circle-radius": ["+", ["min", 18, ["+", 3, ["*", 2.1, ["max", 0, ["coalesce", ["get", "mag"], 1]]]]], 8], "circle-opacity": 0 } });
+    if (readyRef.current && mapRef.current) ensureLayers(mapRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clustering]);
 
@@ -278,13 +259,12 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
           <div className="panel px-4 py-2 text-sm mut">Loading USGS feed…</div>
         </div>
       )}
-      {/* Layer controls */}
       <div className="absolute left-2 top-2 z-10 flex flex-col gap-1">
         <div className="panel flex items-center gap-1 p-1" role="group" aria-label="Basemap">
           {(["dark", "light", "satellite"] as BasemapKey[]).map((k) => (
             <button key={k} onClick={() => setBasemap(k)} aria-pressed={effectiveBasemap === k}
               className={`kbd-focus flex items-center gap-1 rounded px-2 py-1 text-[11px] ${effectiveBasemap === k ? "bg-cyan-500/20 text-cyan-300" : "mut hover:text-cyan-200"}`}>
-              {k === "satellite" ? <Satellite size={12} /> : k === "dark" ? <Layers size={12} /> : <Layers size={12} />}
+              {k === "satellite" ? <Satellite size={12} /> : <Layers size={12} />}
               {k === "dark" ? "Dark" : k === "light" ? "Light" : "Satellite"}
             </button>
           ))}
@@ -328,7 +308,7 @@ export function MapLegend() {
       <div className="space-y-0.5">
         {DEPTH_STOPS.map((d) => (
           <div key={d.label} className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: d.stroke.replace(/rgba?\(255,255,255,[\d.]+\)/, "#cbd5e1") }} />
+            <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-slate-300" style={{ opacity: d.width / 1.5 }} />
             <span className="mut">{d.label}</span>
           </div>
         ))}
