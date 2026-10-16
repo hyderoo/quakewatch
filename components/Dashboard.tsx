@@ -147,7 +147,12 @@ export default function Dashboard() {
               flyTo={flyTo} onSelect={handleSelect} loading={loading} />
             <div className="absolute bottom-8 left-2 z-10 hidden gap-1 md:flex" role="group" aria-label="Quick map views">
               {QUICK_VIEWS.map((v) => (
-                <button key={v.key} onClick={() => setFlyTo({ center: v.center, zoom: v.zoom, nonce: Date.now() })}
+                <button key={v.key} onClick={() => {
+                  // Quick views also switch the data scope, so e.g. Japan never flies
+                  // the camera to a region the active filter (Indonesia/BMKG) hides.
+                  setGeo(v.key === "indonesia" ? "indonesia" : "world");
+                  setFlyTo({ center: v.center, zoom: v.zoom, nonce: Date.now() });
+                }}
                   className="kbd-focus panel px-2 py-1 text-[11px] mut hover:text-cyan-300">
                   {v.label}
                 </button>
