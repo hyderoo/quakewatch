@@ -75,7 +75,17 @@ export interface QuakeEvent {
   hasShakemap: boolean;
   region: string; // best-effort parsed from place
   isIndonesia: boolean;
+  source: EventSource; // which agency published this event
+  // BMKG-only fields (null for USGS events):
+  tsunamiPotential: string | null; // BMKG "Potensi" text, e.g. tsunami potential statement
+  feltArea: string | null; // BMKG "Dirasakan" felt-area report
+  bmkgShakemapUrl: string | null; // BMKG shakemap image, when published
+  bmkgLists: BmkgListKind[]; // which BMKG lists contain this event (empty for USGS)
 }
+
+export type EventSource = "usgs" | "bmkg";
+export type BmkgListKind = "terkini" | "dirasakan";
+export type IndonesiaSource = EventSource;
 
 export type TimeRangeKey = "1h" | "24h" | "7d" | "30d";
 export type GeoFilter = "world" | "indonesia";

@@ -45,6 +45,11 @@ export function normalizeFeature(f: UsgsFeature): QuakeEvent | null {
     hasShakemap: (p.types ?? "").includes("shakemap"),
     region: parseRegion(p.place),
     isIndonesia: inIndonesia(lon, lat),
+    source: "usgs",
+    tsunamiPotential: null,
+    feltArea: null,
+    bmkgShakemapUrl: null,
+    bmkgLists: [],
   };
 }
 

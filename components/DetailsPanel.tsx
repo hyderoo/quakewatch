@@ -62,6 +62,9 @@ export default function DetailsPanel({ event, theme, onClose }: { event: QuakeEv
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
         <MiniMap event={event} theme={theme} />
         <div className="mt-2 flex flex-wrap gap-1.5">
+          {event.source === "bmkg" && (
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">SOURCE: BMKG (OFFICIAL ID)</span>
+          )}
           {event.status && (
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${event.status === "reviewed" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-300"}`}>
               {event.status === "reviewed" ? "REVIEWED" : `STATUS: ${event.status.toUpperCase()}`}
@@ -88,25 +91,40 @@ export default function DetailsPanel({ event, theme, onClose }: { event: QuakeEv
           </Row>
           <Row label="Event ID"><span className="mono text-[11px]">{event.id}</span></Row>
           <Row label="Network">{event.net ?? "—"}</Row>
-          <Row label="Significance">{event.sig !== null ? `${event.sig} / 1000` : "—"}</Row>
-          <Row label="Felt reports">{event.felt !== null ? `${event.felt} (max CDI ${event.cdi ?? "—"})` : "none reported"}</Row>
-          <Row label="ShakeMap (MMI)">{event.hasShakemap ? `available · MMI ${event.mmi ?? "—"}` : "not available for this event"}</Row>
-          <Row label="Last revised">{event.updated ? fmtUtc(event.updated) : "—"}</Row>
+          {event.source === "bmkg" ? (
+            <>
+              <Row label="Tsunami potential"><span className="max-w-[200px] inline-block">{event.tsunamiPotential ?? "—"}</span></Row>
+              <Row label="Felt area (Dirasakan)"><span className="max-w-[200px] inline-block">{event.feltArea ?? "not reported"}</span></Row>
+              <Row label="BMKG bulletin">{event.bmkgLists.includes("terkini") ? (event.bmkgLists.includes("dirasakan") ? "Terkini (M5.0+) + Dirasakan" : "Gempabumi Terkini (M5.0+)") : "Gempabumi Dirasakan (felt)"}</Row>
+              <Row label="ShakeMap">{event.bmkgShakemapUrl ? (
+                <a href={event.bmkgShakemapUrl} target="_blank" rel="noreferrer" className="kbd-focus text-cyan-300 hover:underline">view image <ExternalLink size={10} className="inline" /></a>
+              ) : "not published"}</Row>
+            </>
+          ) : (
+            <>
+              <Row label="Significance">{event.sig !== null ? `${event.sig} / 1000` : "—"}</Row>
+              <Row label="Felt reports">{event.felt !== null ? `${event.felt} (max CDI ${event.cdi ?? "—"})` : "none reported"}</Row>
+              <Row label="ShakeMap (MMI)">{event.hasShakemap ? `available · MMI ${event.mmi ?? "—"}` : "not available for this event"}</Row>
+              <Row label="Last revised">{event.updated ? fmtUtc(event.updated) : "—"}</Row>
+            </>
+          )}
         </div>
         <p className="mt-2 text-[11px] mut">
-          {event.status === "reviewed"
-            ? "Reviewed solution: parameters checked by a seismic analyst."
-            : "Preliminary: automatic solution; magnitude, depth, and location may be revised."}
+          {event.source === "bmkg"
+            ? "Official bulletin from BMKG, Indonesia's agency for meteorology, climatology, and geophysics. Parameter differences with USGS are expected; the agencies run different networks."
+            : event.status === "reviewed"
+              ? "Reviewed solution: parameters checked by a seismic analyst."
+              : "Preliminary: automatic solution; magnitude, depth, and location may be revised."}
           {" "}Magnitude alone does not imply damage or casualties.
         </p>
       </div>
       <div className="border-t px-3 py-2" style={{ borderColor: "var(--border)" }}>
         {event.url ? (
           <a href={event.url} target="_blank" rel="noreferrer" className="kbd-focus flex items-center justify-center gap-1.5 rounded bg-cyan-500/15 px-3 py-2 text-[12px] font-semibold text-cyan-300 hover:bg-cyan-500/25">
-            Open on USGS <ExternalLink size={12} />
+            {event.source === "bmkg" ? "Open BMKG Gempabumi" : "Open on USGS"} <ExternalLink size={12} />
           </a>
         ) : (
-          <span className="block text-center text-[11px] mut">No USGS event page link in feed</span>
+          <span className="block text-center text-[11px] mut">No event page link in feed</span>
         )}
       </div>
     </aside>

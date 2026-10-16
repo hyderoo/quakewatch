@@ -3,7 +3,7 @@ import { FeedState } from "@/lib/types";
 import { fmtClock } from "@/lib/format";
 import { ExternalLink } from "lucide-react";
 
-export default function Footer({ feed }: { feed: FeedState }) {
+export default function Footer({ feed, sourceLabel, bmkgFeed }: { feed: FeedState; sourceLabel: string; bmkgFeed?: FeedState }) {
   return (
     <footer className="panel mx-2 mb-2 mt-2 px-3 py-3 text-[11px] mut" aria-label="Data sources and attribution">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -25,19 +25,26 @@ export default function Footer({ feed }: { feed: FeedState }) {
           <a className="kbd-focus text-cyan-300 hover:underline" href="https://github.com/fraxen/tectonicplates" target="_blank" rel="noreferrer">Bird (2003) PB2002</a>
         </span>
         <span>
-          Indonesian context:{" "}
-          <a className="kbd-focus text-cyan-300 hover:underline" href="https://www.bmkg.go.id/gempabumi/gempabumi-terkini.bmkg" target="_blank" rel="noreferrer">
-            BMKG recent earthquakes <ExternalLink size={10} className="inline" />
+          Indonesia data:{" "}
+          <a className="kbd-focus text-cyan-300 hover:underline" href="https://data.bmkg.go.id/gempabumi/" target="_blank" rel="noreferrer">
+            BMKG open data <ExternalLink size={10} className="inline" />
           </a>{" "}
-          (separate agency; USGS events are not BMKG-verified)
+          (attribution: BMKG; latest-15 bulletins, not a complete catalog; USGS and BMKG events are never merged)
         </span>
       </div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>
-          Feed status: <strong className={feed.status === "live" ? "text-emerald-400" : feed.status === "stale" ? "text-amber-400" : "text-red-400"}>{feed.status.toUpperCase()}</strong>
+          Feed status ({sourceLabel}): <strong className={feed.status === "live" ? "text-emerald-400" : feed.status === "stale" ? "text-amber-400" : "text-red-400"}>{feed.status.toUpperCase()}</strong>
           {feed.lastSuccess && ` · last success ${fmtClock(feed.lastSuccess)}`}
           {feed.error && ` · last error: ${feed.error}`}
         </span>
+        {bmkgFeed && (
+          <span>
+            BMKG: <strong className={bmkgFeed.status === "live" ? "text-emerald-400" : bmkgFeed.status === "stale" ? "text-amber-400" : bmkgFeed.status === "connecting" ? "text-slate-400" : "text-red-400"}>{bmkgFeed.status.toUpperCase()}</strong>
+            {bmkgFeed.lastSuccess && ` · last success ${fmtClock(bmkgFeed.lastSuccess)}`}
+            {bmkgFeed.error && ` · last error: ${bmkgFeed.error}`}
+          </span>
+        )}
         <span>QuakeWatch is an independent portfolio project, not an official warning system. For warnings follow USGS, BMKG, and local authorities.</span>
       </div>
     </footer>

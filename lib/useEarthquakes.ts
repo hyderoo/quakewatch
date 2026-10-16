@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertItem, AlertRule, EventFilters, FeedState, GeoFilter, QuakeEvent, TIME_RANGES, TimeRangeKey } from "./types";
 import { fetchUsgsFeed, FeedError } from "./usgs";
+import { fetchBmkgEvents, BmkgError } from "./bmkg";
 
 export const REFRESH_OPTIONS = [
   { label: "30s", ms: 30_000 },
@@ -11,15 +12,28 @@ export const REFRESH_OPTIONS = [
 ];
 export const DEFAULT_REFRESH_MS = 60_000; // USGS feeds update roughly once a minute
 
-export function useEarthquakes(range: TimeRangeKey, refreshMs: number) {
+interface LoaderResult {
+  events: QuakeEvent[];
+  feed: FeedState;
+  newIds: Set<string>;
+  reload: () => void;
+}
+
+// Shared polling loader: tracks connectivity honestly (LIVE only after a real
+// success, STALE with last-good data on failure, OFFLINE with no data at all),
+// and flashes rows that are new since the previous successful fetch.
+function useEventLoader(
+  fetcher: (signal: AbortSignal) => Promise<QuakeEvent[]>,
+  resetKey: string, // change forces state reset + refetch
+  refreshMs: number,
+  sourceLabel: string,
+): LoaderResult {
   const [events, setEvents] = useState<QuakeEvent[]>([]);
   const [feed, setFeed] = useState<FeedState>({ status: "connecting", lastSuccess: null, lastAttempt: null, error: null, eventCount: 0 });
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const inFlight = useRef(false);
   const knownIds = useRef<Set<string>>(new Set());
   const primed = useRef(false);
-
-  const url = TIME_RANGES.find((r) => r.key === range)!.feed;
 
   const load = useCallback(async () => {
     if (inFlight.current) return; // never overlap refresh requests
@@ -28,7 +42,7 @@ export function useEarthquakes(range: TimeRangeKey, refreshMs: number) {
     const timeout = setTimeout(() => ctrl.abort(), 20_000);
     const attempted = Date.now();
     try {
-      const { events: fresh } = await fetchUsgsFeed(url, ctrl.signal);
+      const fresh = await fetcher(ctrl.signal);
       const added = new Set<string>();
       if (primed.current) {
         for (const e of fresh) if (!knownIds.current.has(e.id)) added.add(e.id);
@@ -44,7 +58,8 @@ export function useEarthquakes(range: TimeRangeKey, refreshMs: number) {
       }
     } catch (e) {
       const isAbort = (e as Error).name === "AbortError"; // our 20s timeout
-      const msg = isAbort ? "USGS feed request timed out (20s)" : e instanceof FeedError ? e.message : `Unexpected error: ${(e as Error).message}`;
+      const known = e instanceof FeedError || e instanceof BmkgError;
+      const msg = isAbort ? `${sourceLabel} feed request timed out (20s)` : known ? (e as Error).message : `Unexpected error: ${(e as Error).message}`;
       setFeed((prev) => ({
         status: prev.lastSuccess ? "stale" : "offline",
         lastSuccess: prev.lastSuccess,
@@ -56,16 +71,16 @@ export function useEarthquakes(range: TimeRangeKey, refreshMs: number) {
       clearTimeout(timeout);
       inFlight.current = false;
     }
-  }, [url]);
+  }, [fetcher, sourceLabel]);
 
-  // Reset when the feed URL changes (time range switch), then refetch.
+  // Reset when the resetKey changes (e.g. USGS time range switch), then refetch.
   useEffect(() => {
     setEvents([]);
     setFeed({ status: "connecting", lastSuccess: null, lastAttempt: null, error: null, eventCount: 0 });
     knownIds.current = new Set();
     primed.current = false;
     load();
-  }, [load]);
+  }, [load, resetKey]);
 
   useEffect(() => {
     const t = setInterval(load, refreshMs);
@@ -73,6 +88,18 @@ export function useEarthquakes(range: TimeRangeKey, refreshMs: number) {
   }, [load, refreshMs]);
 
   return { events, feed, newIds, reload: load };
+}
+
+export function useEarthquakes(range: TimeRangeKey, refreshMs: number): LoaderResult {
+  const url = TIME_RANGES.find((r) => r.key === range)!.feed;
+  const fetcher = useCallback((signal: AbortSignal) => fetchUsgsFeed(url, signal).then((r) => r.events), [url]);
+  return useEventLoader(fetcher, url, refreshMs, "USGS");
+}
+
+// BMKG publishes fixed-size bulletins (latest 15 M5.0+ and latest 15 felt events),
+// not time-bounded feeds, so the time range does not change what is fetched.
+export function useBmkg(refreshMs: number): LoaderResult {
+  return useEventLoader(fetchBmkgEvents, "bmkg", refreshMs, "BMKG");
 }
 
 export function applyFilters(events: QuakeEvent[], geo: GeoFilter, f: EventFilters): QuakeEvent[] {

@@ -5,7 +5,9 @@ import { REFRESH_OPTIONS } from "@/lib/useEarthquakes";
 import { fmtClock, relTime } from "@/lib/format";
 
 interface Props {
-  feed: FeedState;
+  feed: FeedState; // status of the currently active source
+  sourceLabel: string; // display name of the active source
+  otherFeed: { label: string; feed: FeedState } | null; // secondary source shown in Indonesia mode
   range: TimeRangeKey;
   setRange: (r: TimeRangeKey) => void;
   geo: GeoFilter;
@@ -51,10 +53,16 @@ export default function Header(p: Props) {
       {p.feed.status === "stale" && p.feed.lastSuccess && (
         <div className="text-[11px] text-amber-400/90">showing last good data ({relTime(p.feed.lastSuccess)})</div>
       )}
-      {p.feed.status === "offline" && <div className="text-[11px] text-red-400/90">USGS feed unreachable — no data</div>}
+      {p.feed.status === "offline" && <div className="text-[11px] text-red-400/90">{p.sourceLabel} feed unreachable — no data</div>}
 
       <div className="hidden items-center gap-1 rounded border px-2 py-1 text-[11px] mut md:flex" style={{ borderColor: "var(--border)" }}>
-        <Activity size={12} className="text-cyan-400" /> USGS Earthquake Hazards Program
+        <Activity size={12} className="text-cyan-400" /> {p.sourceLabel}
+        {p.otherFeed && (
+          <span className="ml-1 flex items-center gap-1 border-l pl-2" style={{ borderColor: "var(--border)" }}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_UI[p.otherFeed.feed.status].dot}`} />
+            {p.otherFeed.label} {p.otherFeed.feed.status.toUpperCase()}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-1" role="group" aria-label="Geographic filter">
