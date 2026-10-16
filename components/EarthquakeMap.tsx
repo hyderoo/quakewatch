@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 
 // Static export bundlers can mangle the module-worker URL; serve it ourselves.
-maplibregl.setWorkerUrl(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/maplibre-gl-worker.mjs`);
+const WORKER_URL = `${typeof window !== "undefined" ? window.location.origin : ""}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/maplibre-gl-worker.mjs`;
+maplibregl.setWorkerUrl(WORKER_URL); // must be absolute: maplibre resolves it against a placeholder base
 import { QuakeEvent, ThemeMode } from "@/lib/types";
 import { MAG_STOPS, DEPTH_STOPS, magColor } from "@/lib/scale";
 import { Layers, Satellite, Mountain } from "lucide-react";
