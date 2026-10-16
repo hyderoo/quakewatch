@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
+
+// Static export bundlers can mangle the module-worker URL; serve it ourselves.
+maplibregl.setWorkerUrl(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/maplibre-gl-worker.mjs`);
 import { QuakeEvent, ThemeMode } from "@/lib/types";
 import { fmtDepth, fmtLocal, fmtMag, fmtUtc } from "@/lib/format";
 import { magColor, pagerBadge } from "@/lib/scale";
