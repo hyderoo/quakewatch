@@ -132,7 +132,12 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen flex-col gap-2">
       <Header feed={activeFeed} sourceLabel={SOURCE_LABEL[activeSrc]} otherFeed={otherFeed}
-        range={range} setRange={setRange} geo={geo} setGeo={setGeo}
+        range={range} setRange={setRange} geo={geo} setGeo={(g) => {
+          setGeo(g);
+          // Region filters also move the camera so the map never sits on a region the filter hides.
+          if (g === "japan") setFlyTo({ center: [138, 37], zoom: 3.8, nonce: Date.now() });
+          else if (g === "indonesia") setFlyTo({ center: [118, -2.5], zoom: 4, nonce: Date.now() });
+        }}
         search={filters.search} setSearch={(s) => setFilters({ ...filters, search: s })}
         theme={theme} toggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         refreshMs={refreshMs} setRefreshMs={setRefreshMs} onRefreshNow={reloadAll} />
