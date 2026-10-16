@@ -1,7 +1,11 @@
-import { QuakeEvent, UsgsCollection, UsgsFeature, INDONESIA_BBOX } from "./types";
+import { QuakeEvent, UsgsCollection, UsgsFeature, INDONESIA_BBOX, JAPAN_BBOX } from "./types";
 
 export function inIndonesia(lon: number, lat: number): boolean {
   return lon >= INDONESIA_BBOX.minLon && lon <= INDONESIA_BBOX.maxLon && lat >= INDONESIA_BBOX.minLat && lat <= INDONESIA_BBOX.maxLat;
+}
+
+export function inJapan(lon: number, lat: number): boolean {
+  return lon >= JAPAN_BBOX.minLon && lon <= JAPAN_BBOX.maxLon && lat >= JAPAN_BBOX.minLat && lat <= JAPAN_BBOX.maxLat;
 }
 
 // "12 km SSE of Palu, Indonesia" -> "Indonesia"; "Southern Sumatra, Indonesia" -> same.
@@ -45,11 +49,15 @@ export function normalizeFeature(f: UsgsFeature): QuakeEvent | null {
     hasShakemap: (p.types ?? "").includes("shakemap"),
     region: parseRegion(p.place),
     isIndonesia: inIndonesia(lon, lat),
+    isJapan: inJapan(lon, lat),
     source: "usgs",
     tsunamiPotential: null,
     feltArea: null,
     bmkgShakemapUrl: null,
     bmkgLists: [],
+    maxIntensity: null,
+    jmaReportType: null,
+    jmaReportedAt: null,
   };
 }
 

@@ -10,7 +10,7 @@
 // These are bulletins, not a complete catalog.
 
 import { BmkgListKind, QuakeEvent } from "./types";
-import { inIndonesia } from "./usgs";
+import { inIndonesia, inJapan } from "./usgs";
 
 export const BMKG_ENDPOINTS = {
   autogempa: "https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json",
@@ -84,11 +84,15 @@ function normalizeItem(item: BmkgRawItem, list: BmkgListKind): { key: string; ev
     hasShakemap: shakemapUrl !== null,
     region: item.Wilayah ?? "Unknown region",
     isIndonesia: inIndonesia(lon, lat),
+    isJapan: inJapan(lon, lat),
     source: "bmkg",
     tsunamiPotential: item.Potensi ?? null,
     feltArea: item.Dirasakan ?? null,
     bmkgShakemapUrl: shakemapUrl,
     bmkgLists: [list],
+    maxIntensity: null,
+    jmaReportType: null,
+    jmaReportedAt: null,
   };
   return { key, event };
 }

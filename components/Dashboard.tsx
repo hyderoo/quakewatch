@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EventFilters, GeoFilter, IndonesiaSource, ThemeMode, TIME_RANGES, TimeRangeKey } from "@/lib/types";
-import { useAlerts, useEarthquakes, useBmkg, applyFilters, DEFAULT_REFRESH_MS } from "@/lib/useEarthquakes";
+import { EventFilters, GeoFilter, IndonesiaSource, JapanSource, ThemeMode, TIME_RANGES, TimeRangeKey } from "@/lib/types";
+import { useAlerts, useEarthquakes, useBmkg, useJma, applyFilters, DEFAULT_REFRESH_MS } from "@/lib/useEarthquakes";
 import { computeKpis } from "@/lib/analytics";
 import { haversineKm, fmtClock } from "@/lib/format";
 import Header from "./Header";
@@ -12,6 +12,7 @@ import DetailsPanel from "./DetailsPanel";
 import Charts from "./Charts";
 import AlertCenter from "./AlertCenter";
 import IndonesiaPanel from "./IndonesiaPanel";
+import JapanPanel from "./JapanPanel";
 import Footer from "./Footer";
 
 function parseCoords(s: string): [number, number] | null {
@@ -22,13 +23,15 @@ function parseCoords(s: string): [number, number] | null {
   return [lat, lon];
 }
 
-const SOURCE_LABEL = { usgs: "USGS Earthquake Hazards Program", bmkg: "BMKG open data" } as const;
+const SOURCE_LABEL = { usgs: "USGS Earthquake Hazards Program", bmkg: "BMKG open data", jma: "JMA (Japan Meteorological Agency)" } as const;
 
 export default function Dashboard() {
   const [range, setRange] = useState<TimeRangeKey>("24h");
   const [geo, setGeo] = useState<GeoFilter>("world");
   // Indonesia view defaults to BMKG (the official Indonesian agency); USGS stays one click away.
   const [indonesiaSource, setIndonesiaSource] = useState<IndonesiaSource>("bmkg");
+  // Japan view defaults to JMA (the national agency); USGS stays one click away.
+  const [japanSource, setJapanSource] = useState<JapanSource>("jma");
   const [filters, setFilters] = useState<EventFilters>({ minMag: 0, maxDepthKm: null, status: "all", search: "" });
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [refreshMs, setRefreshMs] = useState(DEFAULT_REFRESH_MS);
@@ -37,6 +40,7 @@ export default function Dashboard() {
 
   const usgs = useEarthquakes(range, refreshMs);
   const bmkg = useBmkg(refreshMs);
+  const jma = useJma(refreshMs);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -44,18 +48,29 @@ export default function Dashboard() {
   }, [theme]);
 
   const bmkgActive = geo === "indonesia" && indonesiaSource === "bmkg";
+  const jmaActive = geo === "japan" && japanSource === "jma";
+  const activeSrc: "usgs" | "bmkg" | "jma" = bmkgActive ? "bmkg" : jmaActive ? "jma" : "usgs";
   const rangeMs = TIME_RANGES.find((r) => r.key === range)!.ms;
 
-  // BMKG lists are not time-bounded, so we apply the selected range ourselves.
+  // BMKG and JMA lists are not time-bounded feeds, so we apply the selected range ourselves.
   const bmkgRanged = useMemo(() => {
     const cutoff = Date.now() - rangeMs;
     return bmkg.events.filter((e) => e.time >= cutoff);
   }, [bmkg.events, rangeMs]);
+  const jmaRanged = useMemo(() => {
+    const cutoff = Date.now() - rangeMs;
+    return jma.events.filter((e) => e.time >= cutoff);
+  }, [jma.events, rangeMs]);
 
-  const activeEvents = bmkgActive ? bmkgRanged : usgs.events;
-  const activeFeed = bmkgActive ? bmkg.feed : usgs.feed;
-  const activeNewIds = bmkgActive ? bmkg.newIds : usgs.newIds;
-  const otherFeed = geo === "indonesia" ? (bmkgActive ? { label: "USGS", feed: usgs.feed } : { label: "BMKG", feed: bmkg.feed }) : null;
+  const loaders = { usgs, bmkg, jma } as const;
+  const activeEvents = bmkgActive ? bmkgRanged : jmaActive ? jmaRanged : usgs.events;
+  const activeFeed = loaders[activeSrc].feed;
+  const activeNewIds = loaders[activeSrc].newIds;
+  const otherFeed = geo === "indonesia"
+    ? (bmkgActive ? { label: "USGS", feed: usgs.feed } : { label: "BMKG", feed: bmkg.feed })
+    : geo === "japan"
+      ? (jmaActive ? { label: "USGS", feed: usgs.feed } : { label: "JMA", feed: jma.feed })
+      : null;
 
   const { rules, setRules, alerts, clearAlerts } = useAlerts(activeEvents);
 
@@ -67,6 +82,7 @@ export default function Dashboard() {
 
   const kpis = useMemo(() => computeKpis(filtered), [filtered]);
   const indonesiaEvents = useMemo(() => activeEvents.filter((e) => e.isIndonesia), [activeEvents]);
+  const japanEvents = useMemo(() => activeEvents.filter((e) => e.isJapan), [activeEvents]);
   const selected = useMemo(() => activeEvents.find((e) => e.id === selectedId) ?? null, [activeEvents, selectedId]);
 
   const flyToEvent = (id: string) => {
@@ -84,6 +100,11 @@ export default function Dashboard() {
     setIndonesiaSource(src);
     setSelectedId(null);
     if (src === "bmkg" && filters.status !== "all") setFilters({ ...filters, status: "all" });
+  };
+  const switchJapanSource = (src: JapanSource) => {
+    setJapanSource(src);
+    setSelectedId(null);
+    if (src === "jma" && filters.status !== "all") setFilters({ ...filters, status: "all" });
   };
 
   // Coordinate search: fly to the point and select the nearest event within 1000 km.
@@ -106,11 +127,11 @@ export default function Dashboard() {
   }, [coordQuery, activeEvents]);
 
   const loading = activeFeed.status === "connecting";
-  const reloadAll = () => { usgs.reload(); bmkg.reload(); };
+  const reloadAll = () => { usgs.reload(); bmkg.reload(); jma.reload(); };
 
   return (
     <div className="flex min-h-screen flex-col gap-2">
-      <Header feed={activeFeed} sourceLabel={SOURCE_LABEL[bmkgActive ? "bmkg" : "usgs"]} otherFeed={otherFeed}
+      <Header feed={activeFeed} sourceLabel={SOURCE_LABEL[activeSrc]} otherFeed={otherFeed}
         range={range} setRange={setRange} geo={geo} setGeo={setGeo}
         search={filters.search} setSearch={(s) => setFilters({ ...filters, search: s })}
         theme={theme} toggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -138,6 +159,27 @@ export default function Dashboard() {
             </span>
           </div>
         )}
+        {geo === "japan" && (
+          <div className="panel flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2" aria-label="Japan data source">
+            <span className="text-[11px] font-semibold uppercase tracking-widest mut">Japan source</span>
+            <div className="flex items-center gap-1" role="group" aria-label="Japan data source toggle">
+              {(["jma", "usgs"] as JapanSource[]).map((src) => (
+                <button key={src} onClick={() => switchJapanSource(src)} aria-pressed={japanSource === src}
+                  className={`kbd-focus rounded px-2 py-1 text-[11px] ${japanSource === src ? "bg-cyan-500/20 text-cyan-300" : "mut hover:text-cyan-200"}`}>
+                  {src === "jma" ? "JMA (official)" : "USGS"}
+                </button>
+              ))}
+            </div>
+            <span className={`flex items-center gap-1.5 text-[11px] ${jma.feed.status === "live" ? "text-emerald-400" : jma.feed.status === "connecting" ? "text-slate-400" : jma.feed.status === "stale" ? "text-amber-400" : "text-red-400"}`}>
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${jma.feed.status === "live" ? "bg-emerald-400" : jma.feed.status === "connecting" ? "bg-slate-400" : jma.feed.status === "stale" ? "bg-amber-400" : "bg-red-500"}`} />
+              JMA {jma.feed.status.toUpperCase()}
+              {jma.feed.lastSuccess && <span className="mut">· {fmtClock(jma.feed.lastSuccess)}</span>}
+            </span>
+            <span className="text-[11px] mut">
+              JMA list covers roughly the latest 30 days from an unofficial, undocumented endpoint. Magnitude is JMA&apos;s Mj, which can differ from USGS Mw.
+            </span>
+          </div>
+        )}
         <KpiBar kpis={kpis} range={range} loading={loading} />
 
         <div className="grid flex-1 gap-2 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -150,7 +192,7 @@ export default function Dashboard() {
                 <button key={v.key} onClick={() => {
                   // Quick views also switch the data scope, so e.g. Japan never flies
                   // the camera to a region the active filter (Indonesia/BMKG) hides.
-                  setGeo(v.key === "indonesia" ? "indonesia" : "world");
+                  setGeo(v.key === "indonesia" ? "indonesia" : v.key === "japan" ? "japan" : "world");
                   setFlyTo({ center: v.center, zoom: v.zoom, nonce: Date.now() });
                 }}
                   className="kbd-focus panel px-2 py-1 text-[11px] mut hover:text-cyan-300">
@@ -161,19 +203,22 @@ export default function Dashboard() {
           </div>
           <EventFeed events={filtered} filters={filters} setFilters={setFilters}
             selectedId={selectedId} onSelect={handleSelect} newIds={activeNewIds} loading={loading}
-            showStatusFilter={!bmkgActive}
-            emptyHint={bmkgActive ? "BMKG publishes only the latest 15 M5.0+ and 15 felt events; there may be nothing inside this range yet." : undefined} />
+            showStatusFilter={activeSrc === "usgs"}
+            emptyHint={bmkgActive ? "BMKG publishes only the latest 15 M5.0+ and 15 felt events; there may be nothing inside this range yet." : jmaActive ? "JMA lists about the last 30 days of reports; there may be no located events inside this range." : undefined} />
         </div>
 
-        <IndonesiaPanel events={indonesiaEvents} source={indonesiaSource} bmkgFeed={bmkg.feed}
+        <IndonesiaPanel events={indonesiaEvents} source={bmkgActive ? "bmkg" : "usgs"} bmkgFeed={bmkg.feed}
           onFocus={() => { setGeo("indonesia"); setFlyTo({ center: [118, -2.5], zoom: 4, nonce: Date.now() }); }} />
+
+        <JapanPanel events={japanEvents} source={jmaActive ? "jma" : "usgs"} jmaFeed={jma.feed}
+          onFocus={() => { setGeo("japan"); setFlyTo({ center: [138, 37], zoom: 3.8, nonce: Date.now() }); }} />
 
         <Charts events={filtered} range={range} loading={loading} />
 
         <AlertCenter rules={rules} setRules={setRules} alerts={alerts} clearAlerts={clearAlerts} />
       </main>
 
-      <Footer feed={activeFeed} sourceLabel={SOURCE_LABEL[bmkgActive ? "bmkg" : "usgs"]} bmkgFeed={bmkg.feed} />
+      <Footer feed={activeFeed} sourceLabel={SOURCE_LABEL[activeSrc]} bmkgFeed={bmkg.feed} jmaFeed={jma.feed} />
       <DetailsPanel event={selected} theme={theme} onClose={() => setSelectedId(null)} />
     </div>
   );

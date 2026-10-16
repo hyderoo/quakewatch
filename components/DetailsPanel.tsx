@@ -65,6 +65,9 @@ export default function DetailsPanel({ event, theme, onClose }: { event: QuakeEv
           {event.source === "bmkg" && (
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">SOURCE: BMKG (OFFICIAL ID)</span>
           )}
+          {event.source === "jma" && (
+            <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">SOURCE: JMA (JAPAN)</span>
+          )}
           {event.status && (
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${event.status === "reviewed" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-300"}`}>
               {event.status === "reviewed" ? "REVIEWED" : `STATUS: ${event.status.toUpperCase()}`}
@@ -91,7 +94,14 @@ export default function DetailsPanel({ event, theme, onClose }: { event: QuakeEv
           </Row>
           <Row label="Event ID"><span className="mono text-[11px]">{event.id}</span></Row>
           <Row label="Network">{event.net ?? "—"}</Row>
-          {event.source === "bmkg" ? (
+          {event.source === "jma" ? (
+            <>
+              <Row label="Max intensity (shindo)">{event.maxIntensity ?? "not reported"}</Row>
+              <Row label="Magnitude">{fmtMag(event.mag)} <span className="mut">(JMA Mj)</span></Row>
+              <Row label="Report type"><span className="max-w-[200px] inline-block">{event.jmaReportType ?? "—"}</span></Row>
+              <Row label="Report issued">{event.jmaReportedAt ? fmtUtc(event.jmaReportedAt) : "—"}</Row>
+            </>
+          ) : event.source === "bmkg" ? (
             <>
               <Row label="Tsunami potential"><span className="max-w-[200px] inline-block">{event.tsunamiPotential ?? "—"}</span></Row>
               <Row label="Felt area (Dirasakan)"><span className="max-w-[200px] inline-block">{event.feltArea ?? "not reported"}</span></Row>
@@ -110,7 +120,9 @@ export default function DetailsPanel({ event, theme, onClose }: { event: QuakeEv
           )}
         </div>
         <p className="mt-2 text-[11px] mut">
-          {event.source === "bmkg"
+          {event.source === "jma"
+            ? "Source: Japan Meteorological Agency website (https://www.jma.go.jp/). Data edited and processed by QuakeWatch; not a JMA product. Magnitude is JMA's Mj and can differ from USGS Mw; JMA parameters may be revised in later reports."
+            : event.source === "bmkg"
             ? "Official bulletin from BMKG, Indonesia's agency for meteorology, climatology, and geophysics. Parameter differences with USGS are expected; the agencies run different networks."
             : event.status === "reviewed"
               ? "Reviewed solution: parameters checked by a seismic analyst."
@@ -121,7 +133,7 @@ export default function DetailsPanel({ event, theme, onClose }: { event: QuakeEv
       <div className="border-t px-3 py-2" style={{ borderColor: "var(--border)" }}>
         {event.url ? (
           <a href={event.url} target="_blank" rel="noreferrer" className="kbd-focus flex items-center justify-center gap-1.5 rounded bg-cyan-500/15 px-3 py-2 text-[12px] font-semibold text-cyan-300 hover:bg-cyan-500/25">
-            {event.source === "bmkg" ? "Open BMKG Gempabumi" : "Open on USGS"} <ExternalLink size={12} />
+            {event.source === "jma" ? "Open JMA earthquake information" : event.source === "bmkg" ? "Open BMKG Gempabumi" : "Open on USGS"} <ExternalLink size={12} />
           </a>
         ) : (
           <span className="block text-center text-[11px] mut">No event page link in feed</span>

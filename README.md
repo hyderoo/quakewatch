@@ -1,6 +1,6 @@
 # QuakeWatch
 
-**Global Seismic Intelligence** — a real-time earthquake monitoring dashboard built on the official [USGS Earthquake Hazards Program](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) GeoJSON feeds, plus official [BMKG](https://data.bmkg.go.id/gempabumi/) open data for the Indonesia view. Worldwide coverage with a first-class Indonesia mode.
+**Global Seismic Intelligence** — a real-time earthquake monitoring dashboard built on the official [USGS Earthquake Hazards Program](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) GeoJSON feeds, plus official [BMKG](https://data.bmkg.go.id/gempabumi/) open data for the Indonesia view and [JMA](https://www.jma.go.jp/) (Japan Meteorological Agency) data for the Japan view. Worldwide coverage with first-class Indonesia and Japan modes.
 
 ## Live demo
 
@@ -14,6 +14,7 @@ _Live demo link will be added after the Vercel deployment. Until then, a preview
 - **KPIs + analytics**: event counts, M4.5+, M6.0+, strongest, latest — plus activity timeline, magnitude histogram, depth distribution, regional ranking, and strongest-events list. All computed from the currently filtered dataset.
 - **Alert center**: configurable in-app rules (default M5.0+ and M6.0+; custom thresholds, Indonesia-only option). Each event triggers a rule at most once.
 - **Indonesia focus**: bounding-box summary panel, one-click map centering, and a dedicated **BMKG (official) / USGS source toggle**. The BMKG mode merges the Gempabumi Terkini (latest 15 M5.0+) and Gempabumi Dirasakan (latest 15 felt) bulletins, shows tsunami-potential and felt-area text, BMKG shakemap images, and carries its own independent LIVE/STALE/OFFLINE status.
+- **Japan focus**: Japan geographic filter, summary panel, and a **JMA / USGS source toggle** (JMA by default). The JMA mode shows located events from JMA's report list with the published max shindo intensity, JMA's Mj magnitude, and its own independent LIVE/STALE/OFFLINE status. Quick views switch the data scope together with the camera.
 
 ## Data honesty
 
@@ -23,6 +24,9 @@ _Live demo link will be added after the Vercel deployment. Until then, a preview
 - BMKG publishes **fixed-size bulletins, not a complete catalog**: Gempabumi Terkini holds only the latest 15 events of M5.0+, Gempabumi Dirasakan only the latest 15 felt events, and autogempa is the single latest automatic event (used for its shakemap image). Older periods or smaller events may simply be absent — the UI says so instead of implying completeness. The time-range selector filters these bulletins by origin time on the client.
 - BMKG bulletins carry no USGS-style review status, significance, or PAGER level; those fields are shown as unavailable rather than invented. BMKG tsunami information is the agency's free-text "Potensi" statement, shown verbatim.
 - BMKG endpoints: `autogempa.json`, `gempaterkini.json`, `gempadirasakan.json` under `https://data.bmkg.go.id/DataMKG/TEWS/` — CORS-enabled, rate limit 60 req/min/IP, **attribution to BMKG is mandatory** and shown in the UI footer and Indonesia panel.
+- **JMA data (Japan view) comes from an unofficial, undocumented endpoint**: `https://www.jma.go.jp/bosai/quake/data/list.json` is the JSON file JMA's own website reads, not a documented public API, so JMA can change or remove it without notice. QuakeWatch guards the schema (a changed shape flips the JMA status to STALE/OFFLINE instead of showing wrong data) and never polls it faster than every 60s (upstream cache is 60s). It is CORS-enabled and covers roughly the **latest 30 days**, so the 30D range is the maximum meaningful window.
+- JMA list handling: reports are deduplicated by event id (`eid`, newest usable report wins, highest published max intensity kept); report types with no hypocenter coordinates or numeric magnitude (e.g. seismic intensity flashes) are dropped, so JMA counts are not a complete catalog. Coordinates are parsed from `cod` (`+lat+lon-depth_m/`; far-field reports have no depth). JMA magnitude is **Mj**, which differs from USGS Mw. JMA and USGS events are never merged.
+- JMA attribution (Public Data License v1.0, https://www.jma.go.jp/jma/en/copyright.html): "Source: Japan Meteorological Agency website" (https://www.jma.go.jp/), plus a notice that QuakeWatch edited/processed the data. QuakeWatch is not a JMA or government product. Shown in the footer, Japan panel, and details panel.
 - Alerts are evaluated in the page. **No push notifications or background monitoring exist** and none are claimed.
 - Regional rankings are counts from the selected feed and period — **not** measures of regional seismic risk.
 - Tectonic plate boundaries: [Bird (2003) PB2002](https://github.com/fraxen/tectonicplates), bundled in `public/data/plates.json`.
@@ -68,9 +72,14 @@ Manual acceptance checklist (each maps to a user-visible behavior):
 | 11 | Indonesia view → BMKG source (default) | BMKG status pill in header and source bar; amber BMKG badges on feed rows; details panel shows tsunami potential, felt area, bulletin list, BMKG shakemap; footer shows BMKG attribution and status |
 | 12 | Indonesia view → switch to USGS | Map/feed/KPIs switch to USGS events; review-status filter reappears; BMKG status remains visible as secondary |
 | 13 | Block `data.bmkg.go.id` in Indonesia/BMKG mode | BMKG status flips to STALE (last-good data kept) or OFFLINE on first load; USGS status unaffected; no fabricated events |
+| 14 | Click the Japan quick view (from any mode) | Header switches to Japan; source defaults to JMA; map flies to Japan; JMA status pill in header and source bar; rose JMA badges with shindo on feed rows |
+| 15 | Japan view → switch to USGS, then back to JMA | Map/feed/KPIs switch sources; review-status filter appears only for USGS; JMA status stays visible as secondary |
+| 16 | Japan view → JMA at 7D and 30D | Events appear (list covers ~30 days); 1H/24H may be legitimately empty; details panel shows max shindo, Mj, report type, JMA attribution |
+| 17 | Block `www.jma.go.jp` in Japan/JMA mode | JMA status flips to STALE (last-good data kept) or OFFLINE on first load; USGS unaffected; no fabricated events |
+| 18 | JMA rows without coordinates/magnitude (intensity flash reports); same `eid` in several reports | Not shown; one marker per `eid` |
 
 Suggested automation starting points: Playwright smoke test (page loads, feed populates, filter narrows counts), contract tests on `lib/usgs.ts` and `lib/bmkg.ts` normalization against recorded fixtures (USGS: nullable `mag`/`place`/`time`, dedupe by `id`; BMKG: stringly-typed numbers, single-object autogempa vs array lists, merge by origin time + coordinates), and a unit pass over `lib/analytics.ts` binning. The running app exposes the MapLibre instance as `window.__qwMap` so E2E tests can project event coordinates to screen pixels and click real markers (used to verify test #4 during development).
 
 ## Credits & license
 
-Built with AI assistance (Instinct) under human direction and review — architecture, data-honesty rules, and acceptance criteria were specified and verified by a human. Earthquake data: USGS and BMKG (data.bmkg.go.id). Basemaps: CARTO / Esri. Icons: Lucide. MIT — see [LICENSE](LICENSE).
+Built with AI assistance (Instinct) under human direction and review — architecture, data-honesty rules, and acceptance criteria were specified and verified by a human. Earthquake data: USGS, BMKG (data.bmkg.go.id), and the Japan Meteorological Agency website (https://www.jma.go.jp/; data edited and processed by QuakeWatch). Basemaps: CARTO / Esri. Icons: Lucide. MIT — see [LICENSE](LICENSE).

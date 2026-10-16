@@ -75,20 +75,26 @@ export interface QuakeEvent {
   hasShakemap: boolean;
   region: string; // best-effort parsed from place
   isIndonesia: boolean;
+  isJapan: boolean;
   source: EventSource; // which agency published this event
   // BMKG-only fields (null for USGS events):
   tsunamiPotential: string | null; // BMKG "Potensi" text, e.g. tsunami potential statement
   feltArea: string | null; // BMKG "Dirasakan" felt-area report
   bmkgShakemapUrl: string | null; // BMKG shakemap image, when published
   bmkgLists: BmkgListKind[]; // which BMKG lists contain this event (empty for USGS)
+  // JMA-only fields (null for other sources):
+  maxIntensity: string | null; // JMA max shindo (seismic intensity) as published: "1".."4","5-","5+","6-","6+","7"
+  jmaReportType: string | null; // English report title, e.g. "Earthquake and Seismic Intensity Information"
+  jmaReportedAt: number | null; // ms, when JMA issued the latest report for this event
 }
 
-export type EventSource = "usgs" | "bmkg";
+export type EventSource = "usgs" | "bmkg" | "jma";
 export type BmkgListKind = "terkini" | "dirasakan";
-export type IndonesiaSource = EventSource;
+export type IndonesiaSource = "bmkg" | "usgs";
+export type JapanSource = "jma" | "usgs";
 
 export type TimeRangeKey = "1h" | "24h" | "7d" | "30d";
-export type GeoFilter = "world" | "indonesia";
+export type GeoFilter = "world" | "indonesia" | "japan";
 export type ThemeMode = "dark" | "light";
 
 export interface FeedState {
@@ -122,6 +128,7 @@ export interface AlertItem {
   place: string | null;
   time: number;
   url: string | null;
+  source: EventSource;
 }
 
 export const TIME_RANGES: { key: TimeRangeKey; label: string; feed: string; ms: number }[] = [
@@ -133,3 +140,6 @@ export const TIME_RANGES: { key: TimeRangeKey; label: string; feed: string; ms: 
 
 // Indonesia bounding box used by the geographic filter (approximate archipelago extent).
 export const INDONESIA_BBOX = { minLon: 94.5, maxLon: 141.5, minLat: -11.5, maxLat: 6.5 };
+
+// Japan bounding box used by the geographic filter (main islands, Ryukyu, Izu/Ogasawara, Kuril approaches).
+export const JAPAN_BBOX = { minLon: 122, maxLon: 150, minLat: 20, maxLat: 47 };

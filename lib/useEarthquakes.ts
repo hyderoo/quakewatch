@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertItem, AlertRule, EventFilters, FeedState, GeoFilter, QuakeEvent, TIME_RANGES, TimeRangeKey } from "./types";
 import { fetchUsgsFeed, FeedError } from "./usgs";
 import { fetchBmkgEvents, BmkgError } from "./bmkg";
+import { fetchJmaEvents, JmaError, JMA_MIN_REFRESH_MS } from "./jma";
 
 export const REFRESH_OPTIONS = [
   { label: "30s", ms: 30_000 },
@@ -58,7 +59,7 @@ function useEventLoader(
       }
     } catch (e) {
       const isAbort = (e as Error).name === "AbortError"; // our 20s timeout
-      const known = e instanceof FeedError || e instanceof BmkgError;
+      const known = e instanceof FeedError || e instanceof BmkgError || e instanceof JmaError;
       const msg = isAbort ? `${sourceLabel} feed request timed out (20s)` : known ? (e as Error).message : `Unexpected error: ${(e as Error).message}`;
       setFeed((prev) => ({
         status: prev.lastSuccess ? "stale" : "offline",
@@ -102,10 +103,18 @@ export function useBmkg(refreshMs: number): LoaderResult {
   return useEventLoader(fetchBmkgEvents, "bmkg", refreshMs, "BMKG");
 }
 
+// JMA publishes a rolling ~30-day list of reports (not time-bounded feeds). The undocumented
+// endpoint is cached for 60s upstream, so we never poll it faster than that, whatever the UI
+// refresh setting is.
+export function useJma(refreshMs: number): LoaderResult {
+  return useEventLoader(fetchJmaEvents, "jma", Math.max(refreshMs, JMA_MIN_REFRESH_MS), "JMA");
+}
+
 export function applyFilters(events: QuakeEvent[], geo: GeoFilter, f: EventFilters): QuakeEvent[] {
   const q = f.search.trim().toLowerCase();
   return events.filter((e) => {
     if (geo === "indonesia" && !e.isIndonesia) return false;
+    if (geo === "japan" && !e.isJapan) return false;
     if ((e.mag ?? -Infinity) < f.minMag) return false;
     if (f.maxDepthKm !== null && e.depthKm !== null && e.depthKm > f.maxDepthKm) return false;
     if (f.status !== "all" && e.status !== f.status) return false;
@@ -131,7 +140,7 @@ export function useAlerts(events: QuakeEvent[]) {
         const key = `${r.id}:${e.id}`; // one alert per rule per event, ever
         if (fired.current.has(key)) continue;
         fired.current.add(key);
-        fresh.push({ key, ruleLabel: r.label, eventId: e.id, mag: e.mag, place: e.place, time: e.time, url: e.url });
+        fresh.push({ key, ruleLabel: r.label, eventId: e.id, mag: e.mag, place: e.place, time: e.time, url: e.url, source: e.source });
       }
     }
     if (fresh.length) setAlerts((prev) => [...fresh, ...prev].slice(0, 50));

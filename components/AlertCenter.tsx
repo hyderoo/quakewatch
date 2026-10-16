@@ -65,7 +65,7 @@ export default function AlertCenter({ rules, setRules, alerts, clearAlerts }: Pr
               <span className="ml-auto shrink-0 text-[10px] text-amber-300">{a.ruleLabel}</span>
             </div>
             <div className="mt-0.5 flex items-center gap-2 text-[10px] mut">
-              <span>{relTime(a.time)} · {fmtLocal(a.time)} · source: USGS</span>
+              <span>{relTime(a.time)} · {fmtLocal(a.time)} · source: {a.source.toUpperCase()}</span>
               {a.url && <a href={a.url} target="_blank" rel="noreferrer" className="kbd-focus text-cyan-300 hover:underline">details</a>}
             </div>
           </div>

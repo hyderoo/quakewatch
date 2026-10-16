@@ -3,7 +3,7 @@ import { FeedState } from "@/lib/types";
 import { fmtClock } from "@/lib/format";
 import { ExternalLink } from "lucide-react";
 
-export default function Footer({ feed, sourceLabel, bmkgFeed }: { feed: FeedState; sourceLabel: string; bmkgFeed?: FeedState }) {
+export default function Footer({ feed, sourceLabel, bmkgFeed, jmaFeed }: { feed: FeedState; sourceLabel: string; bmkgFeed?: FeedState; jmaFeed?: FeedState }) {
   return (
     <footer className="panel mx-2 mb-2 mt-2 px-3 py-3 text-[11px] mut" aria-label="Data sources and attribution">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -31,6 +31,15 @@ export default function Footer({ feed, sourceLabel, bmkgFeed }: { feed: FeedStat
           </a>{" "}
           (attribution: BMKG; latest-15 bulletins, not a complete catalog; USGS and BMKG events are never merged)
         </span>
+        <span>
+          Japan data: Source:{" "}
+          <a className="kbd-focus text-cyan-300 hover:underline" href="https://www.jma.go.jp/" target="_blank" rel="noreferrer">
+            Japan Meteorological Agency website <ExternalLink size={10} className="inline" />
+          </a>
+          . Data edited and processed by QuakeWatch; this is not a JMA product.{" "}
+          <a className="kbd-focus text-cyan-300 hover:underline" href="https://www.jma.go.jp/jma/en/copyright.html" target="_blank" rel="noreferrer">Terms (Public Data License v1.0)</a>
+          . Unofficial, undocumented endpoint (~30 days, Mj magnitude); never merged with USGS.
+        </span>
       </div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>
@@ -45,7 +54,14 @@ export default function Footer({ feed, sourceLabel, bmkgFeed }: { feed: FeedStat
             {bmkgFeed.error && ` · last error: ${bmkgFeed.error}`}
           </span>
         )}
-        <span>QuakeWatch is an independent portfolio project, not an official warning system. For warnings follow USGS, BMKG, and local authorities.</span>
+        {jmaFeed && (
+          <span>
+            JMA: <strong className={jmaFeed.status === "live" ? "text-emerald-400" : jmaFeed.status === "stale" ? "text-amber-400" : jmaFeed.status === "connecting" ? "text-slate-400" : "text-red-400"}>{jmaFeed.status.toUpperCase()}</strong>
+            {jmaFeed.lastSuccess && ` · last success ${fmtClock(jmaFeed.lastSuccess)}`}
+            {jmaFeed.error && ` · last error: ${jmaFeed.error}`}
+          </span>
+        )}
+        <span>QuakeWatch is an independent portfolio project, not an official warning system. For warnings follow USGS, BMKG, JMA, and local authorities.</span>
       </div>
     </footer>
   );

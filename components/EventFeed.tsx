@@ -12,7 +12,7 @@ interface Props {
   onSelect: (id: string) => void;
   newIds: Set<string>;
   loading: boolean;
-  showStatusFilter: boolean; // USGS-only review-status filter; hidden for BMKG
+  showStatusFilter: boolean; // USGS-only review-status filter; hidden for BMKG/JMA
   emptyHint?: string;
 }
 
@@ -83,6 +83,9 @@ export default function EventFeed({ events, filters, setFilters, selectedId, onS
                 <span className="text-[11px] text-cyan-300/90">{relTime(e.time)}</span>
                 {e.source === "bmkg" && (
                   <span className="rounded bg-amber-500/15 px-1 text-[9px] font-semibold text-amber-400">BMKG</span>
+                )}
+                {e.source === "jma" && (
+                  <span className="rounded bg-rose-500/15 px-1 text-[9px] font-semibold text-rose-300">JMA{e.maxIntensity ? ` · shindo ${e.maxIntensity}` : ""}</span>
                 )}
                 {e.status && STATUS_LABEL[e.status] && (
                   <span className={`rounded px-1 text-[9px] font-semibold ${e.status === "reviewed" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-400"}`}>

@@ -7,7 +7,7 @@ import { fmtClock, relTime } from "@/lib/format";
 interface Props {
   feed: FeedState; // status of the currently active source
   sourceLabel: string; // display name of the active source
-  otherFeed: { label: string; feed: FeedState } | null; // secondary source shown in Indonesia mode
+  otherFeed: { label: string; feed: FeedState } | null; // secondary source shown in Indonesia/Japan mode
   range: TimeRangeKey;
   setRange: (r: TimeRangeKey) => void;
   geo: GeoFilter;
@@ -66,11 +66,11 @@ export default function Header(p: Props) {
       </div>
 
       <div className="flex items-center gap-1" role="group" aria-label="Geographic filter">
-        {(["world", "indonesia"] as GeoFilter[]).map((g) => (
+        {(["world", "indonesia", "japan"] as GeoFilter[]).map((g) => (
           <button key={g} onClick={() => p.setGeo(g)} aria-pressed={p.geo === g}
             className={`kbd-focus flex items-center gap-1 rounded px-2 py-1 text-[11px] ${p.geo === g ? "bg-cyan-500/20 text-cyan-300" : "mut hover:text-cyan-200"}`}>
             {g === "world" ? <Globe2 size={12} /> : <MapPin size={12} />}
-            {g === "world" ? "Worldwide" : "Indonesia"}
+            {g === "world" ? "Worldwide" : g === "indonesia" ? "Indonesia" : "Japan"}
           </button>
         ))}
       </div>
