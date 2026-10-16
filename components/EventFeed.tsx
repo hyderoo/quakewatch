@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<string, string> = { reviewed: "REV", automatic: "AUTO
 
 export default function EventFeed({ events, filters, setFilters, selectedId, onSelect, newIds, loading }: Props) {
   return (
-    <section className="panel flex h-full min-h-0 flex-col" aria-label="Earthquake event feed">
+    <section className="panel flex h-[480px] min-h-0 flex-col lg:h-[calc(100vh-230px)]" aria-label="Earthquake event feed">
       <div className="flex items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
         <h2 className="text-xs font-semibold uppercase tracking-widest mut">Event Feed</h2>
         <span className="mono text-[11px] mut">{events.length} shown</span>

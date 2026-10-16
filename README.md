@@ -63,7 +63,7 @@ Manual acceptance checklist (each maps to a user-visible behavior):
 | 9 | Resize to phone width | Layout stacks, map/feed usable, no overlap |
 | 10 | Toggle theme | Full UI switches; basemap follows unless explicitly chosen |
 
-Suggested automation starting points: Playwright smoke test (page loads, feed populates, filter narrows counts), contract test on `lib/usgs.ts` normalization against a recorded USGS GeoJSON fixture (nullable `mag`/`place`/`time`, dedupe by `id`), and a unit pass over `lib/analytics.ts` binning.
+Suggested automation starting points: Playwright smoke test (page loads, feed populates, filter narrows counts), contract test on `lib/usgs.ts` normalization against a recorded USGS GeoJSON fixture (nullable `mag`/`place`/`time`, dedupe by `id`), and a unit pass over `lib/analytics.ts` binning. The running app exposes the MapLibre instance as `window.__qwMap` so E2E tests can project event coordinates to screen pixels and click real markers (used to verify test #4 during development).
 
 ## Credits & license
 

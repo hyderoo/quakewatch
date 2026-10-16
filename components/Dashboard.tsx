@@ -92,7 +92,7 @@ export default function Dashboard() {
 
         <div className="grid flex-1 gap-2 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* Map occupies ~65% of the main content width on desktop */}
-          <div className="panel relative min-h-[420px] overflow-hidden lg:min-h-[520px]">
+          <div className="panel relative h-[62vh] min-h-[420px] overflow-hidden lg:h-[calc(100vh-230px)]">
             <EarthquakeMap events={filtered} theme={theme} selectedId={selectedId} newIds={newIds}
               flyTo={flyTo} onSelect={handleSelect} loading={loading} />
             <div className="absolute bottom-8 left-2 z-10 hidden gap-1 md:flex" role="group" aria-label="Quick map views">

@@ -157,6 +157,8 @@ export default function EarthquakeMap({ events, theme, selectedId, newIds, flyTo
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
     mapRef.current = map;
+    // Exposed for E2E tests (see README "How this could be tested").
+    (window as unknown as { __qwMap: maplibregl.Map }).__qwMap = map;
 
     map.on("load", () => {
       readyRef.current = true;
