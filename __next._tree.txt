@@ -1,3 +1,3 @@
 :HL["/quakewatch/_next/static/chunks/1gt55aq9oyewx.css","style"]
 1:[["children",{"s":"__PAGE__","h":160}]]
-0:{"b":"yctxJCAQWhaNpQZ_pIXa8","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
+0:{"b":"7hiu7-OAem8yfPIBo1fjz","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
