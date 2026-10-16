@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+
+:root {
+  --bg: #0a0f1e; --panel: #0f1729; --panel-2: #131d33; --border: #1e2b47;
+  --text: #e2e8f0; --muted: #8b98b0;
+}
+.light {
+  --bg: #f1f5f9; --panel: #ffffff; --panel-2: #f8fafc; --border: #d7dfe9;
+  --text: #0f172a; --muted: #5b6b82;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.mut { color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.kbd-focus:focus-visible { outline: 2px solid #22d3ee; outline-offset: 1px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+@keyframes pulse-live { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.live-dot { animation: pulse-live 1.6s ease-in-out infinite; }
+@keyframes flash-new { 0% { background: rgba(34,211,238,0.22); } 100% { background: transparent; } }
+.flash-new { animation: flash-new 3s ease-out forwards; }
+.maplibregl-popup-content {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 12px; padding: 8px 10px;
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 50%, var(--panel) 75%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
