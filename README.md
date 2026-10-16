@@ -4,7 +4,7 @@
 
 ## Live demo
 
-_Live demo link will be added after the Vercel deployment. Until then, a preview runs on GitHub Pages: https://hyderoo.github.io/quakewatch/_
+**https://quakewatch-one.vercel.app/** (Vercel) · secondary preview on GitHub Pages: https://hyderoo.github.io/quakewatch/
 
 ## What it does
 
@@ -49,6 +49,8 @@ npx serve out      # serve the production build locally
 Refresh interval defaults to 60 s (USGS feeds cache ~1 min) and is configurable in the header (30 s – 5 min).
 
 ## Deploy to Vercel
+
+This repo is deployed at https://quakewatch-one.vercel.app/. To deploy your own copy:
 
 1. In Vercel: **Add New → Project → Import** this repo.
 2. Framework is auto-detected (Next.js) — no settings to change. **Deploy**.
