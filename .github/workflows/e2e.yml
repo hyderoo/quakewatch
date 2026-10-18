@@ -41,6 +41,7 @@ jobs:
           mkdir -p /tmp/pages/e2e
           cp -r playwright-report/. /tmp/pages/e2e/
           touch /tmp/pages/.nojekyll
+          printf '%s' '{"git":{"deploymentEnabled":{"gh-pages":false}}}' > /tmp/pages/vercel.json
           cd /tmp/pages
           git add -A
           git commit -qm "Playwright report for ${GITHUB_SHA::7}" || exit 0
