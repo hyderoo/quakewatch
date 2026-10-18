@@ -85,3 +85,7 @@ Suggested automation starting points: Playwright smoke test (page loads, feed po
 ## Credits & license
 
 Built with AI assistance (Instinct) under human direction and review — architecture, data-honesty rules, and acceptance criteria were specified and verified by a human. Earthquake data: USGS, BMKG (data.bmkg.go.id), and the Japan Meteorological Agency website (https://www.jma.go.jp/; data edited and processed by QuakeWatch). Basemaps: CARTO / Esri. Icons: Lucide. MIT — see [LICENSE](LICENSE).
+
+## Testing
+
+End-to-end tests with Playwright run in GitHub Actions against the deployed app ([workflow](.github/workflows/e2e.yml), [latest report](https://hyderoo.github.io/quakewatch/e2e/)). Covered: feed load with real USGS data, geographic and time-range filters, event details open/close, alert-rule add/remove, and theme toggle. Not covered: unit tests, BMKG/JMA failure paths, and map-internal rendering.
