@@ -3,16 +3,18 @@ import { useState } from "react";
 import { AlertItem, AlertRule } from "@/lib/types";
 import { fmtLocal, fmtMag, relTime } from "@/lib/format";
 import { magColor } from "@/lib/scale";
-import { Bell, BellOff, Trash2 } from "lucide-react";
+import { Bell, BellOff, Trash2, Volume2, VolumeX } from "lucide-react";
 
 interface Props {
   rules: AlertRule[];
   setRules: (r: AlertRule[]) => void;
   alerts: AlertItem[];
   clearAlerts: () => void;
+  soundEnabled: boolean;
+  setSoundEnabled: (on: boolean) => void;
 }
 
-export default function AlertCenter({ rules, setRules, alerts, clearAlerts }: Props) {
+export default function AlertCenter({ rules, setRules, alerts, clearAlerts, soundEnabled, setSoundEnabled }: Props) {
   const [customMag, setCustomMag] = useState("4.5");
   const [indoOnly, setIndoOnly] = useState(false);
 
@@ -28,7 +30,18 @@ export default function AlertCenter({ rules, setRules, alerts, clearAlerts }: Pr
     <section className="panel p-3" aria-label="Alert center">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-widest mut">Alert center</h3>
-        <span className="text-[10px] mut">in-app only — no push notifications are sent</span>
+        <span className="flex items-center gap-2">
+          <span className="text-[10px] mut">in-app only — no push notifications are sent</span>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            aria-pressed={soundEnabled}
+            aria-label="Toggle alert sound"
+            title={soundEnabled ? "Alert sound on" : "Alert sound off"}
+            className={`kbd-focus rounded p-1 ${soundEnabled ? "text-amber-300" : "mut"}`}
+          >
+            {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+          </button>
+        </span>
       </div>
       <div className="mb-3 space-y-1.5">
         {rules.map((r) => (

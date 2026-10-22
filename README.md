@@ -88,4 +88,4 @@ Built with AI assistance (Instinct) under human direction and review — archite
 
 ## Testing
 
-End-to-end tests with Playwright run in GitHub Actions against the deployed app ([workflow](.github/workflows/e2e.yml), [latest report](https://hyderoo.github.io/quakewatch/e2e/)). Covered: feed load with real USGS data, geographic and time-range filters, event details open/close, alert-rule add/remove, and theme toggle. Not covered: unit tests, BMKG/JMA failure paths, and map-internal rendering.
+End-to-end tests with Playwright run in GitHub Actions against the deployed app ([workflow](.github/workflows/e2e.yml), [latest report](https://hyderoo.github.io/quakewatch/e2e/)). Covered: feed load with real USGS data, geographic and time-range filters, event details open/close, alert-rule add/remove, theme toggle, provider failure states (network abort and HTTP 500 show OFFLINE with the real error, a later failure keeps last good data as STALE), and the alert sound (a triggered rule beeps, the mute toggle stays silent). Failure and alert tests intercept the USGS feed with recorded fixtures. Not covered: unit tests, BMKG/JMA failure paths, and map-internal rendering.

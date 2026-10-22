@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertItem, AlertRule, EventFilters, FeedState, GeoFilter, QuakeEvent, TIME_RANGES, TimeRangeKey } from "./types";
 import { fetchUsgsFeed, FeedError } from "./usgs";
+import { playAlertSound } from "./sound";
 import { fetchBmkgEvents, BmkgError } from "./bmkg";
 import { fetchJmaEvents, JmaError, JMA_MIN_REFRESH_MS } from "./jma";
 
@@ -123,13 +124,34 @@ export function applyFilters(events: QuakeEvent[], geo: GeoFilter, f: EventFilte
   });
 }
 
+const SOUND_KEY = "quakewatch:alert-sound";
+
 export function useAlerts(events: QuakeEvent[]) {
   const [rules, setRules] = useState<AlertRule[]>(() => [
     { id: "r5", label: "Magnitude 5.0+", minMag: 5.0, indonesiaOnly: false, enabled: true },
     { id: "r6", label: "Magnitude 6.0+", minMag: 6.0, indonesiaOnly: false, enabled: true },
   ]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  // Sound defaults on; the stored choice is read after mount to avoid an SSR/client mismatch.
+  const [soundEnabled, setSoundEnabledState] = useState(true);
   const fired = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      setSoundEnabledState(localStorage.getItem(SOUND_KEY) !== "off");
+    } catch {
+      // storage unavailable: keep the default
+    }
+  }, []);
+
+  const setSoundEnabled = useCallback((on: boolean) => {
+    setSoundEnabledState(on);
+    try {
+      localStorage.setItem(SOUND_KEY, on ? "on" : "off");
+    } catch {
+      // storage unavailable: the toggle still works for this session
+    }
+  }, []);
 
   useEffect(() => {
     const fresh: AlertItem[] = [];
@@ -143,8 +165,14 @@ export function useAlerts(events: QuakeEvent[]) {
         fresh.push({ key, ruleLabel: r.label, eventId: e.id, mag: e.mag, place: e.place, time: e.time, url: e.url, source: e.source });
       }
     }
-    if (fresh.length) setAlerts((prev) => [...fresh, ...prev].slice(0, 50));
-  }, [events, rules]);
+    if (fresh.length) {
+      setAlerts((prev) => [...fresh, ...prev].slice(0, 50));
+      if (soundEnabled) playAlertSound();
+    }
+  }, [events, rules, soundEnabled]);
 
-  return useMemo(() => ({ rules, setRules, alerts, clearAlerts: () => setAlerts([]) }), [rules, alerts]);
+  return useMemo(
+    () => ({ rules, setRules, alerts, clearAlerts: () => setAlerts([]), soundEnabled, setSoundEnabled }),
+    [rules, alerts, soundEnabled, setSoundEnabled],
+  );
 }

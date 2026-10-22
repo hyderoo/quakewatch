@@ -23,6 +23,15 @@ jobs:
         with: { node-version: 22, cache: npm, check-latest: true }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Wait for the Vercel deploy to serve this build
+        # The suite runs against the deployed app. Poll for a markup marker
+        # from the latest change so tests never run against a stale deploy.
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf https://quakewatch-one.vercel.app | grep -q 'Toggle alert sound' && exit 0
+            sleep 5
+          done
+          echo 'Deployed app did not pick up the new build within 5 minutes'; exit 1
       - run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: always()

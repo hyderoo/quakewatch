@@ -72,7 +72,7 @@ export default function Dashboard() {
       ? (jmaActive ? { label: "USGS", feed: usgs.feed } : { label: "JMA", feed: jma.feed })
       : null;
 
-  const { rules, setRules, alerts, clearAlerts } = useAlerts(activeEvents);
+  const { rules, setRules, alerts, clearAlerts, soundEnabled, setSoundEnabled } = useAlerts(activeEvents);
 
   const coordQuery = parseCoords(filters.search);
   const filtered = useMemo(() => {
@@ -220,7 +220,7 @@ export default function Dashboard() {
 
         <Charts events={filtered} range={range} loading={loading} />
 
-        <AlertCenter rules={rules} setRules={setRules} alerts={alerts} clearAlerts={clearAlerts} />
+        <AlertCenter rules={rules} setRules={setRules} alerts={alerts} clearAlerts={clearAlerts} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} />
       </main>
 
       <Footer feed={activeFeed} sourceLabel={SOURCE_LABEL[activeSrc]} bmkgFeed={bmkg.feed} jmaFeed={jma.feed} />
