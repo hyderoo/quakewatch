@@ -28,7 +28,7 @@ jobs:
         # from the latest change so tests never run against a stale deploy.
         run: |
           for i in $(seq 1 60); do
-            curl -sf https://quakewatch-one.vercel.app | grep -q 'Toggle alert sound' && exit 0
+            curl -sf https://quakewatch.web.id | grep -q 'Toggle alert sound' && exit 0
             sleep 5
           done
           echo 'Deployed app did not pick up the new build within 5 minutes'; exit 1

@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : [['list']],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'https://quakewatch-one.vercel.app',
+    baseURL: process.env.E2E_BASE_URL ?? 'https://quakewatch.web.id',
     viewport: { width: 1440, height: 900 },
     actionTimeout: 15_000,
   },
