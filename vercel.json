@@ -30,5 +30,18 @@
     "deploymentEnabled": {
       "gh-pages": false
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "quakewatch-one.vercel.app"
+        }
+      ],
+      "destination": "https://quakewatch.web.id/:path*",
+      "permanent": true
+    }
+  ]
 }
